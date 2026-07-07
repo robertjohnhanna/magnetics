@@ -192,9 +192,13 @@ export class Renderer {
   }
 
   drawVectors(ctx) {
+    // Uniform-length arrows on a regular grid — direction is always legible;
+    // colour (viridis) encodes field strength.  This reads far cleaner than
+    // magnitude-scaled arrows, which vanish in weak-field regions.
     const v = this.view, step = this.opts.gridStep;
     const span = (this.range.max - this.range.min) || 1;
-    const L = step * 0.62;                      // arrow footprint
+    const len = step * 0.62, hs = 5;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     for (let sy = step / 2; sy < v.H; sy += step) {
       for (let sx = step / 2; sx < v.W; sx += step) {
         const wpt = v.toWorld(sx, sy);
@@ -203,25 +207,23 @@ export class Renderer {
         const m = Math.hypot(s[0], s[1]);
         if (m < 1e-13) continue;
         const t = Math.min(1, Math.max(0, (Math.log10(m) - this.range.min) / span));
-        const len = L * (0.45 + 0.55 * t);
-        const ux = s[0] / m, uy = -s[1] / m;    // screen-space unit dir
-        const cx = sx - ux * len / 2, cy = sy - uy * len / 2;   // centre the glyph
+        const ux = s[0] / m, uy = -s[1] / m;
+        const cx = sx - ux * len / 2, cy = sy - uy * len / 2;   // centre glyph on node
         const ex = cx + ux * len, ey = cy + uy * len;
-        const c = viridis(0.35 + 0.65 * t);     // bright end for strong field
+        const c = viridis(0.2 + 0.8 * t);
         const col = `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`;
-        const hs = 3.2 + 3.2 * t, ang = Math.atan2(uy, ux);
-        // dark outline for contrast over the heatmap, then coloured arrow
-        ctx.lineCap = 'round';
-        ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 3.2;
-        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ex, ey); ctx.stroke();
-        ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 1.7;
-        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ex, ey); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(ex, ey);
-        ctx.lineTo(ex - hs * Math.cos(ang - 0.45), ey - hs * Math.sin(ang - 0.45));
-        ctx.lineTo(ex - hs * Math.cos(ang + 0.45), ey - hs * Math.sin(ang + 0.45));
-        ctx.closePath();
-        ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 1; ctx.stroke();
-        ctx.fillStyle = col; ctx.fill();
+        const a = Math.atan2(ey - cy, ex - cx);
+        // dark halo underneath for contrast, then the bright coloured arrow
+        ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ex, ey);
+        ctx.lineTo(ex - hs * Math.cos(a - 0.4), ey - hs * Math.sin(a - 0.4));
+        ctx.moveTo(ex, ey); ctx.lineTo(ex - hs * Math.cos(a + 0.4), ey - hs * Math.sin(a + 0.4));
+        ctx.stroke();
+        ctx.strokeStyle = col; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ex, ey);
+        ctx.lineTo(ex - hs * Math.cos(a - 0.4), ey - hs * Math.sin(a - 0.4));
+        ctx.moveTo(ex, ey); ctx.lineTo(ex - hs * Math.cos(a + 0.4), ey - hs * Math.sin(a + 0.4));
+        ctx.stroke();
       }
     }
   }
@@ -301,8 +303,10 @@ export class Renderer {
     const ctx = this.ctx;
     const n = this.localToScreen(s, [0, 0, d / 2]);
     const sp = this.localToScreen(s, [0, 0, -d / 2]);
-    ctx.fillStyle = '#fff'; ctx.font = '600 11px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('N', n[0], n[1]); ctx.fillText('S', sp[0], sp[1]);
+    ctx.font = '800 14px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 3.5; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(0,0,0,0.9)'; ctx.fillStyle = '#fff';
+    ctx.strokeText('N', n[0], n[1]); ctx.fillText('N', n[0], n[1]);
+    ctx.strokeText('S', sp[0], sp[1]); ctx.fillText('S', sp[0], sp[1]);
   }
 
   drawSphere(s, sel) {

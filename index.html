@@ -24,29 +24,16 @@
 <div id="app">
   <aside id="left">
     <section>
-      <h2>Add</h2>
-      <div class="addgrid">
-        <button data-add="magnet">Bar</button>
-        <button data-add="cylinder">Disc</button>
-        <button data-add="sphere">Sphere</button>
-        <button data-add="coil">Coil</button>
-        <button data-add="loop">Loop</button>
-        <button data-add="wire">Wire</button>
-        <button data-add="dipole">Dipole</button>
-        <button data-add="charge">Charge</button>
-      </div>
+      <h2>Field probe</h2>
+      <div id="probeReadout" class="readout mono">Hover for B · shift-click to pin</div>
     </section>
     <section>
-      <h2>Objects</h2>
-      <div id="objlist"></div>
-      <button id="clearAll" class="danger" style="margin-top:8px;width:100%">Clear all</button>
+      <h2>Force &amp; torque</h2>
+      <div id="forceReadout" class="readout mono">Select an object</div>
     </section>
     <section>
-      <h2>Layers</h2>
-      <label class="chk"><input type="checkbox" id="tglHeat"> Heatmap</label>
-      <label class="chk"><input type="checkbox" id="tglLines"> Field lines</label>
-      <label class="chk"><input type="checkbox" id="tglVec"> Arrows</label>
-      <label class="chk"><input type="checkbox" id="tglGrid"> Grid</label>
+      <h2>Particle data</h2>
+      <div id="partReadout" class="readout mono">Launch a particle</div>
     </section>
     <section>
       <h2>Particle</h2>
@@ -59,6 +46,13 @@
         <button id="pauseSim">Pause</button>
         <button id="clearParts">Clear</button>
       </div>
+    </section>
+    <section>
+      <h2>Layers</h2>
+      <label class="chk"><input type="checkbox" id="tglHeat"> Heatmap</label>
+      <label class="chk"><input type="checkbox" id="tglLines"> Field lines</label>
+      <label class="chk"><input type="checkbox" id="tglVec"> Arrows</label>
+      <label class="chk"><input type="checkbox" id="tglGrid"> Grid</label>
     </section>
   </aside>
 
@@ -78,16 +72,22 @@
 
   <aside id="right">
     <section>
-      <h2>Field probe</h2>
-      <div id="probeReadout" class="readout mono">Hover for B · shift-click to pin</div>
+      <h2>Add</h2>
+      <div class="addgrid">
+        <button data-add="magnet">Bar</button>
+        <button data-add="cylinder">Disc</button>
+        <button data-add="sphere">Sphere</button>
+        <button data-add="coil">Coil</button>
+        <button data-add="loop">Loop</button>
+        <button data-add="wire">Wire</button>
+        <button data-add="dipole">Dipole</button>
+        <button data-add="charge">Charge</button>
+      </div>
     </section>
     <section>
-      <h2>Force &amp; torque</h2>
-      <div id="forceReadout" class="readout mono">Select an object</div>
-    </section>
-    <section>
-      <h2>Particle data</h2>
-      <div id="partReadout" class="readout mono">Launch a particle</div>
+      <h2>Objects</h2>
+      <div id="objlist"></div>
+      <button id="clearAll" class="danger" style="margin-top:8px;width:100%">Clear all</button>
     </section>
     <section>
       <h2>Inspector</h2>
