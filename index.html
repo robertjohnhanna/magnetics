@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Magnetics — Magnetic Field Lab</title>
+  <meta name="description" content="Physics-accurate interactive magnetic field simulator: permanent magnets, electromagnets, moving charges and Lorentz-force particle dynamics.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%8C%81%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+  <h1>⌁ Magnetics <small>field lab</small></h1>
+  <div class="topctrl">
+    <select id="presetSel" title="Load a ready-made scenario"></select>
+    <label>Plane <select id="planeSel"></select></label>
+    <label>Slice (mm) <input id="sliceInput" type="number" value="0" step="1" style="width:64px"></label>
+    <label>Units <select id="unitSel"></select></label>
+  </div>
+</header>
+
+<div id="app">
+  <aside id="left">
+    <section>
+      <h2>Add source</h2>
+      <div class="addgrid">
+        <button data-add="magnet">Bar magnet</button>
+        <button data-add="cylinder">Disc / cylinder</button>
+        <button data-add="coil">Electromagnet</button>
+        <button data-add="loop">Current loop</button>
+        <button data-add="wire">Straight wire</button>
+        <button data-add="dipole">Point dipole</button>
+        <button data-add="charge">Moving charge</button>
+      </div>
+    </section>
+    <section>
+      <h2>Objects</h2>
+      <div id="objlist"></div>
+    </section>
+    <section>
+      <h2>Layers</h2>
+      <label class="chk"><input type="checkbox" id="tglHeat"> |B| heatmap</label>
+      <label class="chk"><input type="checkbox" id="tglLines"> Field lines</label>
+      <label class="chk"><input type="checkbox" id="tglVec"> Vector arrows</label>
+      <label class="chk"><input type="checkbox" id="tglGrid"> Grid</label>
+    </section>
+    <section>
+      <h2>Charged particle</h2>
+      <div class="prow"><label>Type
+        <select id="pType">
+          <option value="electron">electron</option>
+          <option value="proton">proton</option>
+          <option value="custom">custom</option>
+        </select></label>
+      </div>
+      <div class="prow"><label>q (e) <input id="pQ" type="number" value="-1" step="1" style="width:54px"></label>
+        <label>m (mₑ) <input id="pM" type="number" value="1" step="1" style="width:60px"></label></div>
+      <div class="prow"><span>pos mm</span>
+        <input id="pX" type="number" value="-40" step="1"><input id="pY" type="number" value="0" step="1"><input id="pZ" type="number" value="0" step="1"></div>
+      <div class="prow"><span>vel m/s</span>
+        <input id="pVX" type="number" value="0" step="1e5"><input id="pVY" type="number" value="0" step="1e5"><input id="pVZ" type="number" value="3000000" step="1e5"></div>
+      <div class="prow">
+        <label title="Simulation time-step">dt 10^<input id="simSpeed" type="range" min="-12" max="-9" step="0.1" value="-10.3" style="width:90px"></label>
+        <span id="dtLabel" class="mono">5.0e-11 s</span>
+      </div>
+      <div class="prow">
+        <button id="launch" class="primary">Launch</button>
+        <button id="pauseSim">Pause</button>
+        <button id="clearParts">Clear</button>
+      </div>
+      <div id="partReadout" class="readout mono"></div>
+    </section>
+  </aside>
+
+  <main>
+    <div id="canvasWrap">
+      <canvas id="view"></canvas>
+      <div id="axisBadge"><span id="axV">Z</span>↑ &nbsp; <span id="axU">X</span>→</div>
+      <div id="hintBadge">drag object to move · scroll to zoom · drag empty space to pan · Shift-click to pin a probe</div>
+    </div>
+  </main>
+
+  <aside id="right">
+    <section>
+      <h2>Field probe</h2>
+      <div id="probeReadout" class="readout mono">Hover the field to read <b>B</b>. Shift-click to pin.</div>
+    </section>
+    <section>
+      <h2>Inspector</h2>
+      <div id="inspector"></div>
+    </section>
+    <section class="about">
+      <h2>About</h2>
+      <p>Fields are computed from first principles in SI units: exact closed-form
+      solution for uniformly-magnetised blocks, Biot–Savart for all currents,
+      and a Boris pusher for charged-particle motion. See
+      <a href="docs/PHYSICS.md">the physics notes</a>.</p>
+    </section>
+  </aside>
+</div>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
