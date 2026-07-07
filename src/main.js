@@ -420,6 +420,30 @@ window.addEventListener('mouseup', () => {
   dragMode = null; canvas.style.cursor = 'crosshair';
 });
 
+// keyboard: arrow keys nudge the selected object, Delete/Backspace removes it
+window.addEventListener('keydown', (e) => {
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
+  const s = scene.get(selectedId); if (!s) return;
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    scene.remove(s.id); selectedId = null; buildList(); buildInspector(); invalidateField();
+    e.preventDefault(); return;
+  }
+  const step = (snap ? snapStep : 1) * (e.shiftKey ? 5 : 1);
+  const move = { ArrowLeft: [view.uAxis, -step], ArrowRight: [view.uAxis, step],
+                 ArrowUp: [view.vAxis, step], ArrowDown: [view.vAxis, -step] }[e.key];
+  if (!move) return;
+  s.pos[move[0]] += move[1];
+  buildSource(s); buildInspector(); invalidateField();
+  e.preventDefault();
+});
+
+// clear-all button
+document.getElementById('clearAll').addEventListener('click', () => {
+  scene.sources = []; selectedId = null; particles.length = 0; simRunning = false;
+  buildList(); buildInspector(); invalidateField();
+});
+
 function pickSource(sx, sy) {
   for (let i = scene.sources.length - 1; i >= 0; i--) {
     const s = scene.sources[i]; if (!s.visible) continue;
