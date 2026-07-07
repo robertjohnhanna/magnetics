@@ -55,7 +55,7 @@ export class Renderer {
     this.grid = null;
     this.heat = null;               // offscreen grid-resolution heatmap
     this.field = document.createElement('canvas'); // offscreen full-res field layer
-    this.opts = { heatmap: true, lines: true, vectors: false, grid: true, gridStep: 24 };
+    this.opts = { heatmap: true, lines: false, vectors: true, grid: true, gridStep: 30 };
     this.range = { min: -6, max: 0 };
   }
 
@@ -193,8 +193,8 @@ export class Renderer {
 
   drawVectors(ctx) {
     const v = this.view, step = this.opts.gridStep;
-    ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1;
     const span = (this.range.max - this.range.min) || 1;
+    const L = step * 0.62;                      // arrow footprint
     for (let sy = step / 2; sy < v.H; sy += step) {
       for (let sx = step / 2; sx < v.W; sx += step) {
         const wpt = v.toWorld(sx, sy);
@@ -202,14 +202,26 @@ export class Renderer {
         if (!s) continue;
         const m = Math.hypot(s[0], s[1]);
         if (m < 1e-13) continue;
-        const len = step * 0.45 * (0.3 + 0.7 * Math.min(1, (Math.log10(m) - this.range.min) / span));
-        const ex = sx + s[0] / m * len, ey = sy - s[1] / m * len;
-        ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
-        const ang = Math.atan2(ey - sy, ex - sx), hs = 3;
+        const t = Math.min(1, Math.max(0, (Math.log10(m) - this.range.min) / span));
+        const len = L * (0.45 + 0.55 * t);
+        const ux = s[0] / m, uy = -s[1] / m;    // screen-space unit dir
+        const cx = sx - ux * len / 2, cy = sy - uy * len / 2;   // centre the glyph
+        const ex = cx + ux * len, ey = cy + uy * len;
+        const c = viridis(0.35 + 0.65 * t);     // bright end for strong field
+        const col = `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`;
+        const hs = 3.2 + 3.2 * t, ang = Math.atan2(uy, ux);
+        // dark outline for contrast over the heatmap, then coloured arrow
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 3.2;
+        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ex, ey); ctx.stroke();
+        ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 1.7;
+        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ex, ey); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(ex, ey);
-        ctx.lineTo(ex - hs * Math.cos(ang - 0.5), ey - hs * Math.sin(ang - 0.5));
-        ctx.lineTo(ex - hs * Math.cos(ang + 0.5), ey - hs * Math.sin(ang + 0.5));
-        ctx.closePath(); ctx.fill();
+        ctx.lineTo(ex - hs * Math.cos(ang - 0.45), ey - hs * Math.sin(ang - 0.45));
+        ctx.lineTo(ex - hs * Math.cos(ang + 0.45), ey - hs * Math.sin(ang + 0.45));
+        ctx.closePath();
+        ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 1; ctx.stroke();
+        ctx.fillStyle = col; ctx.fill();
       }
     }
   }

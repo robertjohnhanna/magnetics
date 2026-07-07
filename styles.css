@@ -8,6 +8,7 @@ html, body { margin: 0; height: 100%; }
 body {
   background: var(--bg); color: var(--txt); font: 13px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden;
+  text-transform: uppercase;
 }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; }
 

@@ -68,7 +68,7 @@ function draw() {
   drawLegend();
 }
 function requestDraw() { requestFrame(); }
-function invalidateField() { gridDirty = true; requestFrame(); }
+function invalidateField() { gridDirty = true; updateForceTile(); requestFrame(); }
 function invalidateLayers() { layersDirty = true; requestFrame(); }
 
 // ---- probe overlay -----------------------------------------------------
@@ -80,16 +80,17 @@ function drawProbe() {
   const comp = view.planeComps(B);
   const mag = P.vlen(B);
   ctx.strokeStyle = '#ffd24a'; ctx.fillStyle = '#ffd24a'; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.arc(s[0], s[1], 4, 0, 7); ctx.stroke();
+  ctx.beginPath(); ctx.arc(s[0], s[1], probePinned ? 6 : 4, 0, 7); ctx.stroke();
+  if (probePinned) { ctx.beginPath(); ctx.arc(s[0], s[1], 2, 0, 7); ctx.fill(); }
   // in-plane B arrow (fixed pixel length)
   const m2 = Math.hypot(comp.u, comp.v) || 1;
   const len = 34;
   const ex = s[0] + comp.u / m2 * len, ey = s[1] - comp.v / m2 * len;
   ctx.beginPath(); ctx.moveTo(s[0], s[1]); ctx.lineTo(ex, ey); ctx.stroke();
   document.getElementById('probeReadout').innerHTML =
-    `<b>|B|</b> ${fmtField(mag)}<br>` +
-    `<b>B</b> = (${fmtField(B[0])}, ${fmtField(B[1])}, ${fmtField(B[2])})<br>` +
-    `in-plane ${fmtField(Math.hypot(comp.u, comp.v))} · out-of-plane ${fmtField(comp.n)}`;
+    `<b>|B|</b> ${fmtField(mag)}${probePinned ? ' · pinned' : ''}<br>` +
+    `<b>B</b> (${fmtField(B[0])}, ${fmtField(B[1])}, ${fmtField(B[2])})<br>` +
+    `in-plane ${fmtField(Math.hypot(comp.u, comp.v))} · out ${fmtField(comp.n)}`;
 }
 
 // ---- legend ------------------------------------------------------------
@@ -172,54 +173,54 @@ function updateParticleReadout() {
 const paramDefs = {
   magnet: [
     ['Material', 'material'],
-    ['Remanence Br (T)', 'Br', 0.1, 1.6, 0.01],
-    ['Size X (mm)', 'size.0', 1, 100, 0.5],
-    ['Size Y (mm)', 'size.1', 1, 100, 0.5],
-    ['Size Z / axis (mm)', 'size.2', 1, 100, 0.5],
+    ['Br (T)', 'Br', 0.1, 1.6, 0.01],
+    ['W (mm)', 'size.0', 1, 100, 0.5],
+    ['H (mm)', 'size.1', 1, 100, 0.5],
+    ['L / axis (mm)', 'size.2', 1, 100, 0.5],
   ],
   cylinder: [
     ['Material', 'material'],
-    ['Remanence Br (T)', 'Br', 0.1, 1.6, 0.01],
-    ['Diameter (mm)', 'dia', 1, 100, 0.5],
-    ['Length (mm)', 'len', 1, 100, 0.5],
+    ['Br (T)', 'Br', 0.1, 1.6, 0.01],
+    ['Dia (mm)', 'dia', 1, 100, 0.5],
+    ['Len (mm)', 'len', 1, 100, 0.5],
   ],
   sphere: [
     ['Material', 'material'],
-    ['Remanence Br (T)', 'Br', 0.1, 1.6, 0.01],
-    ['Diameter (mm)', 'dia', 1, 100, 0.5],
+    ['Br (T)', 'Br', 0.1, 1.6, 0.01],
+    ['Dia (mm)', 'dia', 1, 100, 0.5],
   ],
   coil: [
-    ['Diameter (mm)', 'dia', 2, 120, 0.5],
-    ['Length (mm)', 'len', 1, 200, 0.5],
+    ['Dia (mm)', 'dia', 2, 120, 0.5],
+    ['Len (mm)', 'len', 1, 200, 0.5],
     ['Turns', 'turns', 1, 5000, 1],
     ['Current (A)', 'current', -50, 50, 0.1],
-    ['Core µ factor (approx)', 'core', 1, 5000, 1],
+    ['Core µ', 'core', 1, 5000, 1],
   ],
   loop: [
-    ['Diameter (mm)', 'dia', 2, 120, 0.5],
+    ['Dia (mm)', 'dia', 2, 120, 0.5],
     ['Current (A)', 'current', -200, 200, 0.5],
   ],
   wire: [
-    ['Length (mm)', 'len', 5, 400, 1],
+    ['Len (mm)', 'len', 5, 400, 1],
     ['Current (A)', 'current', -500, 500, 1],
   ],
   dipole: [
-    ['Moment m (A·m²)', 'moment', -1, 1, 0.001],
+    ['Moment (A·m²)', 'moment', -1, 1, 0.001],
   ],
   charge: [
     ['Charge (e)', 'q', -5, 5, 1],
-    ['Velocity X (m/s)', 'vel.0', -3e7, 3e7, 1e5],
-    ['Velocity Y (m/s)', 'vel.1', -3e7, 3e7, 1e5],
-    ['Velocity Z (m/s)', 'vel.2', -3e7, 3e7, 1e5],
+    ['Vel X (m/s)', 'vel.0', -3e7, 3e7, 1e5],
+    ['Vel Y (m/s)', 'vel.1', -3e7, 3e7, 1e5],
+    ['Vel Z (m/s)', 'vel.2', -3e7, 3e7, 1e5],
   ],
 };
 const commonDefs = [
-  ['Pos X (mm)', 'pos.0', -80, 80, 0.5],
-  ['Pos Y (mm)', 'pos.1', -80, 80, 0.5],
-  ['Pos Z (mm)', 'pos.2', -80, 80, 0.5],
-  ['Yaw ° (about Z)', 'rot.0', -180, 180, 1],
-  ['Pitch ° (about Y)', 'rot.1', -180, 180, 1],
-  ['Roll ° (about X)', 'rot.2', -180, 180, 1],
+  ['X (mm)', 'pos.0', -80, 80, 0.5],
+  ['Y (mm)', 'pos.1', -80, 80, 0.5],
+  ['Z (mm)', 'pos.2', -80, 80, 0.5],
+  ['Yaw °', 'rot.0', -180, 180, 1],
+  ['Pitch °', 'rot.1', -180, 180, 1],
+  ['Roll °', 'rot.2', -180, 180, 1],
 ];
 
 function getPath(o, path) { const k = path.split('.'); let v = o; for (const p of k) v = v[isNaN(p) ? p : +p]; return v; }
@@ -229,7 +230,7 @@ function buildInspector() {
   const el = document.getElementById('inspector');
   el.innerHTML = '';
   const s = scene.get(selectedId);
-  if (!s) { el.innerHTML = '<p class="hint">Select an object to edit its parameters, or add one above.</p>'; return; }
+  if (!s) { el.innerHTML = '<p class="hint">Select an object</p>'; return; }
 
   const title = document.createElement('div'); title.className = 'insp-title';
   title.innerHTML = `<span class="dot" style="background:${s.color}"></span>` +
@@ -273,20 +274,21 @@ function buildInspector() {
   }
   const hr = document.createElement('hr'); el.appendChild(hr);
   for (const def of commonDefs) addRow(...def);
+  updateForceTile();
+}
 
-  // force / torque readout
-  if (momentOf(s)) {
-    const ft = scene.forceTorque(s);
-    if (ft) {
-      const info = document.createElement('div'); info.className = 'ft';
-      info.innerHTML =
-        `<b>Net force</b> ${P.vlen(ft.F).toExponential(2)} N ${fmtVec(ft.F, 1, 'N', 2)}<br>` +
-        `<b>Torque</b> ${P.vlen(ft.tau).toExponential(2)} N·m<br>` +
-        `<b>Moment</b> ${P.vlen(ft.moment).toExponential(2)} A·m² · <b>B here</b> ${fmtField(P.vlen(ft.Bext))}` +
-        `<div class="hint">Dipole approximation — exact for well-separated bodies.</div>`;
-      el.appendChild(info);
-    }
-  }
+// Force/torque data tile (right panel), kept current on any scene change.
+function updateForceTile() {
+  const el = document.getElementById('forceReadout');
+  const s = scene.get(selectedId);
+  if (!s || !momentOf(s)) { el.textContent = s ? 'No force data' : 'Select an object'; return; }
+  const ft = scene.forceTorque(s);
+  if (!ft) { el.textContent = '—'; return; }
+  el.innerHTML =
+    `<b>|F|</b> ${P.vlen(ft.F).toExponential(2)} N ${fmtVec(ft.F, 1, 'N', 2)}<br>` +
+    `<b>τ</b> ${P.vlen(ft.tau).toExponential(2)} N·m<br>` +
+    `<b>m</b> ${P.vlen(ft.moment).toExponential(2)} A·m² · <b>B</b> ${fmtField(P.vlen(ft.Bext))}<br>` +
+    `<span class="hint">dipole approx</span>`;
 }
 function nearestMaterial(Br) {
   let best = 1.30, bd = 1e9;
@@ -326,9 +328,9 @@ bindToggle('tglVec', 'vectors'); bindToggle('tglGrid', 'grid');
 
 // ---- view controls -----------------------------------------------------
 const planes = {
-  'XZ (side, slice Y)': [0, 2, 1],
-  'XY (top, slice Z)':  [0, 1, 2],
-  'YZ (front, slice X)':[1, 2, 0],
+  'XZ · side': [0, 2, 1],
+  'XY · top':  [0, 1, 2],
+  'YZ · front':[1, 2, 0],
 };
 const planeSel = document.getElementById('planeSel');
 for (const name of Object.keys(planes)) planeSel.innerHTML += `<option>${name}</option>`;
@@ -390,7 +392,7 @@ function fitView() {
 
 // Pointer events unify mouse/touch/pen: one-finger drags an object or pans,
 // two fingers pinch-zoom (also works with a mouse via the wheel / zoom buttons).
-let dragMode = null, dragStart = null, dragObjStart = null, probeHover = null;
+let dragMode = null, dragStart = null, dragObjStart = null, probeHover = null, probePinned = false;
 const pointers = new Map();
 let pinch = null;
 const localXY = (e) => { const r = canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
@@ -403,14 +405,16 @@ canvas.addEventListener('pointerdown', (e) => {
     pinch = { dist: Math.hypot(p[0][0] - p[1][0], p[0][1] - p[1][1]) || 1, span: view.spanU };
     dragMode = null; return;
   }
+  if (e.shiftKey) {                                // pin a probe here
+    probe = view.toWorld(sx, sy); probePinned = true; requestDraw(); return;
+  }
   const hit = pickSource(sx, sy);
-  if (hit && !e.shiftKey) {
+  if (hit) {
     if (hit.id !== selectedId) { selectedId = hit.id; buildList(); buildInspector(); }
     dragMode = 'obj'; dragStart = [sx, sy]; dragObjStart = hit.pos.slice();
     canvas.style.cursor = 'grabbing';
-  } else if (e.shiftKey) {
-    probe = view.toWorld(sx, sy); requestDraw();
   } else {
+    probePinned = false;                           // click empty space to unpin
     dragMode = 'pan'; dragStart = [sx, sy, view.center[0], view.center[1]];
     canvas.style.cursor = 'grabbing';
   }
@@ -441,7 +445,7 @@ canvas.addEventListener('pointermove', (e) => {
     s.pos[view.vAxis] = maybeSnap(dragObjStart[view.vAxis] + dv);
     buildSource(s); invalidateField();               // inspector refreshed on drop
   } else if (e.pointerType === 'mouse') {
-    probeHover = view.toWorld(sx, sy); probe = probeHover; requestDraw();
+    if (!probePinned) { probeHover = view.toWorld(sx, sy); probe = probeHover; requestDraw(); }
     canvas.style.cursor = pickSource(sx, sy) ? 'grab' : 'crosshair';
   }
 });
@@ -490,24 +494,27 @@ function pickSource(sx, sy) {
 }
 
 // ---- particle panel ----------------------------------------------------
+// Launch from the left of the current view, moving right (in the view plane),
+// at the chosen speed — no fiddly position/velocity fields needed.
 function launchParticle() {
   const type = document.getElementById('pType').value;
-  let q, mass;
-  if (type === 'electron') { q = -P.QE; mass = P.ME; }
-  else if (type === 'proton') { q = P.QE; mass = P.MP; }
-  else { q = parseFloat(document.getElementById('pQ').value) * P.QE; mass = parseFloat(document.getElementById('pM').value) * P.ME; }
-  const pos = ['pX', 'pY', 'pZ'].map((id) => parseFloat(document.getElementById(id).value) / 1000);
-  const vel = ['pVX', 'pVY', 'pVZ'].map((id) => parseFloat(document.getElementById(id).value));
+  const q = type === 'proton' ? P.QE : -P.QE;
+  const mass = type === 'proton' ? P.MP : P.ME;
+  const speed = Math.abs(parseFloat(document.getElementById('pSpeed').value)) || 3e6;
+  const pos = view.worldFromUV(view.center[0] - view.spanU * 0.4, view.center[1]);
+  const vel = [0, 0, 0]; vel[view.uAxis] = speed;
   particles.push({ x: pos, v: vel, q, mass, trail: [pos.slice()], color: q < 0 ? '#4aa3ff' : '#ff7a4a', alive: true });
   startSim();
 }
 document.getElementById('launch').addEventListener('click', launchParticle);
-document.getElementById('clearParts').addEventListener('click', () => { particles.length = 0; simRunning = false; requestDraw(); });
+document.getElementById('clearParts').addEventListener('click', () => {
+  particles.length = 0; simRunning = false;
+  document.getElementById('partReadout').textContent = 'Launch a particle'; requestDraw();
+});
 document.getElementById('pauseSim').addEventListener('click', (e) => {
   simRunning = !simRunning; e.target.textContent = simRunning ? 'Pause' : 'Resume';
   if (simRunning) requestFrame();
 });
-document.getElementById('simSpeed').addEventListener('input', (e) => { simDt = Math.pow(10, parseFloat(e.target.value)); document.getElementById('dtLabel').textContent = simDt.toExponential(1) + ' s'; });
 
 // ---- presets / scenarios ----------------------------------------------
 const presets = {
@@ -539,7 +546,7 @@ const presets = {
     scene.sources = [];
     const w = defaultSource('wire'); w.name = 'Wire'; w.len = 120; w.current = 60; w.rot = [0, 0, 0];
     scene.add(w); view.spanU = 0.12;
-    planeSel.value = 'XY (top, slice Z)'; planeSel.dispatchEvent(new Event('change'));
+    planeSel.value = 'XY · top'; planeSel.dispatchEvent(new Event('change'));
   },
   'Cyclotron orbit (e⁻ in B)': () => {
     // Coil axis along Z ⇒ B along Z inside.  View the XY plane (from above,
@@ -547,14 +554,13 @@ const presets = {
     scene.sources = [];
     const c = defaultSource('coil'); c.name = 'Field coil'; c.len = 100; c.dia = 100; c.turns = 120; c.current = 4;
     scene.add(c); view.spanU = 0.11;
-    planeSel.value = 'XY (top, slice Z)'; planeSel.dispatchEvent(new Event('change'));
+    planeSel.value = 'XY · top'; planeSel.dispatchEvent(new Event('change'));
     document.getElementById('pType').value = 'electron';
-    document.getElementById('pX').value = 0; document.getElementById('pY').value = 0; document.getElementById('pZ').value = 0;
-    document.getElementById('pVX').value = 0; document.getElementById('pVY').value = 2.5e7; document.getElementById('pVZ').value = 0;
+    document.getElementById('pSpeed').value = 2.5e7;
   },
 };
 const presetSel = document.getElementById('presetSel');
-presetSel.innerHTML = '<option value="">Load scenario…</option>';
+presetSel.innerHTML = '<option value="">Scenario…</option>';
 for (const name of Object.keys(presets)) presetSel.innerHTML += `<option>${name}</option>`;
 presetSel.addEventListener('change', () => {
   if (!presets[presetSel.value]) return;
@@ -567,8 +573,15 @@ presetSel.addEventListener('change', () => {
 // ---- init --------------------------------------------------------------
 function init() {
   resize();
-  presets['Two bar magnets'](); scene.rebuild();
-  selectedId = scene.sources[0].id;
+  // start with a single, strongest-grade sphere magnet
+  const s = defaultSource('sphere'); s.name = 'Sphere'; s.Br = 1.45; s.dia = 20;
+  scene.add(s); view.spanU = 0.12;
+  selectedId = s.id;
+  // snap on @1mm; field lines off, arrows on
+  snap = true; snapStep = 1;
+  snapChk.checked = true; document.getElementById('snapStep').value = 1;
+  document.getElementById('tglLines').checked = renderer.opts.lines;
+  document.getElementById('tglVec').checked = renderer.opts.vectors;
   document.getElementById('axU').textContent = view.axisLabel(view.uAxis);
   document.getElementById('axV').textContent = view.axisLabel(view.vAxis);
   buildList(); buildInspector();
