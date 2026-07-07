@@ -14,8 +14,10 @@
   <div class="topctrl">
     <select id="presetSel" title="Load a ready-made scenario"></select>
     <label>Plane <select id="planeSel"></select></label>
-    <label>Slice (mm) <input id="sliceInput" type="number" value="0" step="1" style="width:64px"></label>
+    <label>Slice (mm) <input id="sliceInput" type="number" value="0" step="1" style="width:60px"></label>
     <label>Units <select id="unitSel"></select></label>
+    <label title="Snap dragged objects to a grid"><input type="checkbox" id="snapChk"> Snap
+      <input id="snapStep" type="number" value="5" step="0.5" min="0.5" style="width:46px"> mm</label>
   </div>
 </header>
 
@@ -75,6 +77,12 @@
   <main>
     <div id="canvasWrap">
       <canvas id="view"></canvas>
+      <div id="zoomCtrl">
+        <button id="zoomIn" title="Zoom in">＋</button>
+        <button id="zoomOut" title="Zoom out">－</button>
+        <button id="zoomFit" title="Fit objects">Fit</button>
+        <button id="zoomReset" title="Reset view">⟲</button>
+      </div>
       <div id="axisBadge"><span id="axV">Z</span>↑ &nbsp; <span id="axU">X</span>→</div>
       <div id="hintBadge">drag object to move · scroll to zoom · drag empty space to pan · Shift-click to pin a probe</div>
     </div>

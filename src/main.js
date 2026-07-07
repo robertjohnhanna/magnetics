@@ -47,10 +47,18 @@ window.addEventListener('resize', () => {
 // The expensive field layers are rendered to an offscreen canvas only when the
 // scene, view or visible layers change; each frame just blits that cached layer
 // and draws lightweight overlays (sources, particles, probe).
-function renderFieldLayer(recomputeGrid) {
-  if (recomputeGrid || !renderer.grid) renderer.computeGrid();
-  renderer.renderField();
+// A single coalescing rAF loop: many invalidations within one frame collapse to
+// at most one field recompute, so dragging/zooming stay smooth.
+let gridDirty = false, layersDirty = false, frameQueued = false;
+function tick() {
+  frameQueued = false;
+  if (gridDirty) { renderer.computeGrid(); renderer.renderField(); gridDirty = layersDirty = false; }
+  else if (layersDirty) { renderer.renderField(); layersDirty = false; }
+  if (simRunning) simStep();
+  draw();
+  if (simRunning) requestFrame();   // keep animating while the sim runs
 }
+function requestFrame() { if (!frameQueued) { frameQueued = true; requestAnimationFrame(tick); } }
 function draw() {
   renderer.clear();
   renderer.blitField();
@@ -59,11 +67,9 @@ function draw() {
   drawProbe();
   drawLegend();
 }
-function requestDraw() { requestAnimationFrame(draw); }
-// scene/view changed → resample the field, then redraw
-function invalidateField() { renderFieldLayer(true); requestDraw(); }
-// only which layers are shown changed → re-render layers, reuse the grid
-function invalidateLayers() { renderFieldLayer(false); requestDraw(); }
+function requestDraw() { requestFrame(); }
+function invalidateField() { gridDirty = true; requestFrame(); }
+function invalidateLayers() { layersDirty = true; requestFrame(); }
 
 // ---- probe overlay -----------------------------------------------------
 function drawProbe() {
@@ -127,8 +133,7 @@ function drawParticles() {
     }
   }
 }
-function simLoop() {
-  if (!simRunning) return;
+function simStep() {
   const fieldFn = (x) => scene.EB(x);
   for (const p of particles) {
     if (!p.alive) continue;
@@ -136,16 +141,13 @@ function simLoop() {
       const r = P.borisStep(p.x, p.v, p.q, p.mass, simDt, fieldFn);
       p.x = r.x; p.v = r.v;
       if (k % 4 === 0) p.trail.push(p.x);
-      // kill if it flies far away
-      const d = Math.hypot(p.x[0] - view.center[0], p.x[2]);
       if (P.vlen(p.x) > view.spanU * 6) { p.alive = false; break; }
     }
     if (p.trail.length > 4000) p.trail.splice(0, p.trail.length - 4000);
   }
   updateParticleReadout();
-  draw();
-  requestAnimationFrame(simLoop);
 }
+function startSim() { if (!simRunning) { simRunning = true; requestFrame(); } }
 function updateParticleReadout() {
   const p = particles[particles.length - 1];
   if (!p) return;
@@ -334,30 +336,66 @@ for (const u of Object.keys(UNITS)) unitSel.innerHTML += `<option>${u}</option>`
 unitSel.value = fieldUnit;
 unitSel.addEventListener('change', () => { fieldUnit = unitSel.value; requestDraw(); });
 
-// ---- pan & zoom --------------------------------------------------------
+// ---- snap, pan & zoom --------------------------------------------------
+let snap = false, snapStep = 5;               // mm
+const maybeSnap = (v) => snap ? Math.round(v / snapStep) * snapStep : v;
+const snapChk = document.getElementById('snapChk');
+snapChk.addEventListener('change', () => { snap = snapChk.checked; });
+document.getElementById('snapStep').addEventListener('change', (e) => { snapStep = Math.max(0.5, parseFloat(e.target.value) || 5); });
+
+function zoomBy(factor, sx, sy) {
+  // keep the world point under (sx,sy) fixed while zooming
+  const before = (sx !== undefined) ? view.toWorld(sx, sy) : null;
+  view.spanU = Math.max(0.004, Math.min(4, view.spanU * factor));
+  if (before) {
+    const after = view.toWorld(sx, sy);
+    view.center[0] += before[view.uAxis] - after[view.uAxis];
+    view.center[1] += before[view.vAxis] - after[view.vAxis];
+  }
+  invalidateField();
+}
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
-  const factor = Math.exp(e.deltaY * 0.001);
-  view.spanU = Math.max(0.005, Math.min(4, view.spanU * factor));
-  invalidateField();
+  const r = canvas.getBoundingClientRect();
+  zoomBy(Math.exp(e.deltaY * 0.0012), e.clientX - r.left, e.clientY - r.top);
 }, { passive: false });
 
-let dragMode = null, dragStart = null, dragObjStart = null;
+// on-canvas zoom / fit controls
+document.getElementById('zoomIn').addEventListener('click', () => zoomBy(1 / 1.3, view.W / 2, view.H / 2));
+document.getElementById('zoomOut').addEventListener('click', () => zoomBy(1.3, view.W / 2, view.H / 2));
+document.getElementById('zoomReset').addEventListener('click', () => { view.spanU = 0.16; view.center = [0, 0]; invalidateField(); });
+document.getElementById('zoomFit').addEventListener('click', fitView);
+function fitView() {
+  const pts = scene.sources.filter((s) => s.visible).map((s) => s._origin);
+  if (!pts.length) return;
+  let uMin = Infinity, uMax = -Infinity, vMin = Infinity, vMax = -Infinity;
+  for (const p of pts) {
+    uMin = Math.min(uMin, p[view.uAxis]); uMax = Math.max(uMax, p[view.uAxis]);
+    vMin = Math.min(vMin, p[view.vAxis]); vMax = Math.max(vMax, p[view.vAxis]);
+  }
+  view.center = [(uMin + uMax) / 2, (vMin + vMax) / 2];
+  const span = Math.max(uMax - uMin, (vMax - vMin) * view.W / view.H, 0.02) * 1.8 + 0.04;
+  view.spanU = Math.max(0.02, Math.min(4, span));
+  invalidateField();
+}
+
+let dragMode = null, dragStart = null, dragObjStart = null, probeHover = null;
 canvas.addEventListener('mousedown', (e) => {
   const r = canvas.getBoundingClientRect();
   const sx = e.clientX - r.left, sy = e.clientY - r.top;
   const hit = pickSource(sx, sy);
-  if (hit) {
-    selectedId = hit.id; buildList(); buildInspector();
+  if (hit && !e.shiftKey) {
+    if (hit.id !== selectedId) { selectedId = hit.id; buildList(); buildInspector(); }
     dragMode = 'obj'; dragStart = [sx, sy]; dragObjStart = hit.pos.slice();
+    canvas.style.cursor = 'grabbing';
   } else if (e.shiftKey) {
     probe = view.toWorld(sx, sy); requestDraw();
   } else {
     dragMode = 'pan'; dragStart = [sx, sy, view.center[0], view.center[1]];
+    canvas.style.cursor = 'grabbing';
   }
 });
 window.addEventListener('mousemove', (e) => {
-  if (!dragMode) return;
   const r = canvas.getBoundingClientRect();
   const sx = e.clientX - r.left, sy = e.clientY - r.top;
   if (dragMode === 'pan') {
@@ -368,20 +406,19 @@ window.addEventListener('mousemove', (e) => {
     const s = scene.get(selectedId); if (!s) return;
     const du = (sx - dragStart[0]) / view.scale * 1000;   // mm
     const dv = -(sy - dragStart[1]) / view.scale * 1000;
-    s.pos[view.uAxis] = dragObjStart[view.uAxis] + du;
-    s.pos[view.vAxis] = dragObjStart[view.vAxis] + dv;
-    buildSource(s); buildInspector(); invalidateField();
+    s.pos[view.uAxis] = maybeSnap(dragObjStart[view.uAxis] + du);
+    s.pos[view.vAxis] = maybeSnap(dragObjStart[view.vAxis] + dv);
+    buildSource(s); invalidateField();               // inspector refreshed on drop
+  } else {
+    // hover probe (cheap: reuse cached field layer)
+    probeHover = view.toWorld(sx, sy); probe = probeHover; requestDraw();
+    canvas.style.cursor = pickSource(sx, sy) ? 'grab' : 'crosshair';
   }
 });
-window.addEventListener('mouseup', () => { dragMode = null; });
-canvas.addEventListener('mousemove', (e) => {
-  if (dragMode) return;
-  const r = canvas.getBoundingClientRect();
-  probeHover = view.toWorld(e.clientX - r.left, e.clientY - r.top);
+window.addEventListener('mouseup', () => {
+  if (dragMode === 'obj') buildInspector();          // sync numeric fields once
+  dragMode = null; canvas.style.cursor = 'crosshair';
 });
-let probeHover = null;
-// live hover probe (lightweight, no heatmap recompute)
-canvas.addEventListener('mousemove', () => { if (!dragMode && probeHover) { probe = probeHover; requestAnimationFrame(draw); } });
 
 function pickSource(sx, sy) {
   for (let i = scene.sources.length - 1; i >= 0; i--) {
@@ -402,13 +439,13 @@ function launchParticle() {
   const pos = ['pX', 'pY', 'pZ'].map((id) => parseFloat(document.getElementById(id).value) / 1000);
   const vel = ['pVX', 'pVY', 'pVZ'].map((id) => parseFloat(document.getElementById(id).value));
   particles.push({ x: pos, v: vel, q, mass, trail: [pos.slice()], color: q < 0 ? '#4aa3ff' : '#ff7a4a', alive: true });
-  if (!simRunning) { simRunning = true; simLoop(); }
+  startSim();
 }
 document.getElementById('launch').addEventListener('click', launchParticle);
 document.getElementById('clearParts').addEventListener('click', () => { particles.length = 0; simRunning = false; requestDraw(); });
 document.getElementById('pauseSim').addEventListener('click', (e) => {
   simRunning = !simRunning; e.target.textContent = simRunning ? 'Pause' : 'Resume';
-  if (simRunning) simLoop();
+  if (simRunning) requestFrame();
 });
 document.getElementById('simSpeed').addEventListener('input', (e) => { simDt = Math.pow(10, parseFloat(e.target.value)); document.getElementById('dtLabel').textContent = simDt.toExponential(1) + ' s'; });
 

@@ -37,6 +37,9 @@ canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
   position: absolute; background: rgba(10,12,18,.6); color: var(--dim);
   padding: 4px 8px; border-radius: 6px; font-size: 11px; pointer-events: none;
 }
+#zoomCtrl { position: absolute; top: 10px; right: 12px; display: flex; flex-direction: column; gap: 5px; }
+#zoomCtrl button { width: 34px; height: 30px; padding: 0; background: rgba(21,25,34,.85); font-size: 15px; line-height: 1; }
+#zoomCtrl button:hover { background: #222a37; }
 #axisBadge { top: 10px; left: 12px; }
 #axisBadge span { color: var(--txt); font-weight: 600; }
 #hintBadge { bottom: 10px; left: 12px; }
