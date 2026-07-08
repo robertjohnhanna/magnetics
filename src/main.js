@@ -87,17 +87,19 @@ function drawProbe() {
   const B = scene.B(probe);
   const comp = view.planeComps(B);
   const mag = P.vlen(B);
-  ctx.strokeStyle = '#ffd24a'; ctx.fillStyle = '#ffd24a'; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.arc(s[0], s[1], probePinned ? 6 : 4, 0, 7); ctx.stroke();
-  if (probePinned) { ctx.beginPath(); ctx.arc(s[0], s[1], 2, 0, 7); ctx.fill(); }
   // in-plane B arrow (fixed pixel length)
   const m2 = Math.hypot(comp.u, comp.v) || 1;
   const len = 34;
   const ex = s[0] + comp.u / m2 * len, ey = s[1] - comp.v / m2 * len;
+  ctx.strokeStyle = '#ffd24a'; ctx.fillStyle = '#ffd24a'; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(s[0], s[1]); ctx.lineTo(ex, ey); ctx.stroke();
+  // draggable pin: outer ring + centre dot (large enough to grab on touch)
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(s[0], s[1], 9, 0, 7); ctx.stroke();
+  ctx.beginPath(); ctx.arc(s[0], s[1], 2.5, 0, 7); ctx.fill();
   const u = UNITS[fieldUnit], dp = Math.abs(mag * u) >= 100 ? 0 : 1;
   document.getElementById('probeReadout').innerHTML =
-    `<div><b>|B|</b> ${fmtField(mag)}${probePinned ? ' · pin' : ''}</div>` +
+    `<div><b>|B|</b> ${fmtField(mag)}</div>` +
     `<div>${(B[0] * u).toFixed(dp)}, ${(B[1] * u).toFixed(dp)}, ${(B[2] * u).toFixed(dp)} ${fieldUnit}</div>` +
     `<div>in-pl ${fmtField(Math.hypot(comp.u, comp.v))} · out ${fmtField(comp.n)}</div>`;
 }
@@ -398,26 +400,42 @@ document.getElementById('zoomIn').addEventListener('click', () => zoomBy(1 / 1.3
 document.getElementById('zoomOut').addEventListener('click', () => zoomBy(1.3, view.W / 2, view.H / 2));
 document.getElementById('zoomReset').addEventListener('click', () => { view.spanU = 0.16; view.center = [0, 0]; invalidateField(); });
 document.getElementById('zoomFit').addEventListener('click', fitView);
+// Approximate physical half-extent of a source [m], so Fit frames its actual
+// size (a big sphere fills the view), not just its centre point.
+function sourceExtent(s) {
+  const M = (v) => v / 1000;
+  switch (s.type) {
+    case 'magnet':   return 0.5 * Math.hypot(M(s.size[0]), M(s.size[1]), M(s.size[2]));
+    case 'sphere':   return M(s.dia) / 2;
+    case 'cylinder':
+    case 'coil':     return Math.max(M(s.dia) / 2, M(s.len) / 2);
+    case 'loop':     return M(s.dia) / 2;
+    case 'wire':     return M(s.len) / 2;
+    default:         return 0.006;
+  }
+}
 function fitView() {
-  const pts = scene.sources.filter((s) => s.visible).map((s) => s._origin);
-  if (!pts.length) return;
+  const vis = scene.sources.filter((s) => s.visible);
+  if (!vis.length) return;
   let uMin = Infinity, uMax = -Infinity, vMin = Infinity, vMax = -Infinity;
-  for (const p of pts) {
-    uMin = Math.min(uMin, p[view.uAxis]); uMax = Math.max(uMax, p[view.uAxis]);
-    vMin = Math.min(vMin, p[view.vAxis]); vMax = Math.max(vMax, p[view.vAxis]);
+  for (const s of vis) {
+    const e = sourceExtent(s), o = s._origin;
+    uMin = Math.min(uMin, o[view.uAxis] - e); uMax = Math.max(uMax, o[view.uAxis] + e);
+    vMin = Math.min(vMin, o[view.vAxis] - e); vMax = Math.max(vMax, o[view.vAxis] + e);
   }
   view.center = [(uMin + uMax) / 2, (vMin + vMax) / 2];
-  const span = Math.max(uMax - uMin, (vMax - vMin) * view.W / view.H, 0.02) * 1.8 + 0.04;
-  view.spanU = Math.max(0.02, Math.min(4, span));
+  const span = Math.max(uMax - uMin, (vMax - vMin) * view.W / view.H, 0.006) * 1.5;
+  view.spanU = Math.max(0.008, Math.min(4, span));
   invalidateField();
 }
 
 // Pointer events unify mouse/touch/pen: one-finger drags an object or pans,
 // two fingers pinch-zoom (also works with a mouse via the wheel / zoom buttons).
-let dragMode = null, dragStart = null, dragObjStart = null, probeHover = null, probePinned = false;
+let dragMode = null, dragStart = null, dragObjStart = null;
 const pointers = new Map();
 let pinch = null;
 const localXY = (e) => { const r = canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+const nearProbe = (sx, sy) => { if (!probe) return false; const p = view.toScreen(probe); return Math.hypot(p[0] - sx, p[1] - sy) < 20; };
 
 canvas.addEventListener('pointerdown', (e) => {
   canvas.setPointerCapture(e.pointerId);
@@ -427,8 +445,8 @@ canvas.addEventListener('pointerdown', (e) => {
     pinch = { dist: Math.hypot(p[0][0] - p[1][0], p[0][1] - p[1][1]) || 1, span: view.spanU };
     dragMode = null; return;
   }
-  if (e.shiftKey) {                                // pin a probe here
-    probe = view.toWorld(sx, sy); probePinned = true; requestDraw(); return;
+  if (nearProbe(sx, sy)) {                          // grab the field-probe pin
+    dragMode = 'probe'; canvas.style.cursor = 'grabbing'; return;
   }
   const hit = pickSource(sx, sy);
   if (hit) {
@@ -436,7 +454,6 @@ canvas.addEventListener('pointerdown', (e) => {
     dragMode = 'obj'; dragStart = [sx, sy]; dragObjStart = hit.pos.slice();
     canvas.style.cursor = 'grabbing';
   } else {
-    probePinned = false;                           // click empty space to unpin
     dragMode = 'pan'; dragStart = [sx, sy, view.center[0], view.center[1]];
     canvas.style.cursor = 'grabbing';
   }
@@ -455,7 +472,9 @@ canvas.addEventListener('pointermove', (e) => {
     view.center[1] += before[view.vAxis] - after[view.vAxis];
     invalidateField(); return;
   }
-  if (dragMode === 'pan') {
+  if (dragMode === 'probe') {
+    probe = view.toWorld(sx, sy); requestDraw();
+  } else if (dragMode === 'pan') {
     view.center[0] = dragStart[2] - (sx - dragStart[0]) / view.scale;
     view.center[1] = dragStart[3] + (sy - dragStart[1]) / view.scale;
     invalidateField();
@@ -467,8 +486,8 @@ canvas.addEventListener('pointermove', (e) => {
     s.pos[view.vAxis] = maybeSnap(dragObjStart[view.vAxis] + dv);
     buildSource(s); invalidateField();               // inspector refreshed on drop
   } else if (e.pointerType === 'mouse') {
-    if (!probePinned) { probeHover = view.toWorld(sx, sy); probe = probeHover; requestDraw(); }
-    canvas.style.cursor = pickSource(sx, sy) ? 'grab' : 'crosshair';
+    // idle hover: cursor feedback only — the probe pin is moved by dragging it
+    canvas.style.cursor = nearProbe(sx, sy) || pickSource(sx, sy) ? 'grab' : 'crosshair';
   }
 });
 function endPointer(e) {
@@ -607,6 +626,8 @@ function init() {
   document.getElementById('tglVec').checked = renderer.opts.vectors;
   document.getElementById('axU').textContent = view.axisLabel(view.uAxis);
   document.getElementById('axV').textContent = view.axisLabel(view.vAxis);
+  // place the draggable field-probe pin where it's visible
+  probe = view.worldFromUV(view.center[0] + view.spanU * 0.3, view.center[1]);
   buildList(); buildInspector();
   invalidateField();
 }
