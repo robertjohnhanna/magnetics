@@ -22,9 +22,6 @@ function fmtField(teslas) {
   const digits = a >= 100 ? 1 : a >= 1 ? 2 : 3;
   return `${val.toFixed(digits)} ${fieldUnit}`;
 }
-function fmtVec(v, unitScale, unit, d = 2) {
-  return `(${(v[0] * unitScale).toFixed(d)}, ${(v[1] * unitScale).toFixed(d)}, ${(v[2] * unitScale).toFixed(d)}) ${unit}`;
-}
 
 // ---- canvas sizing -----------------------------------------------------
 // Setting canvas.width/height clears the bitmap, so only do it when the size
@@ -429,8 +426,9 @@ function fitView() {
   invalidateField();
 }
 
-// Pointer events unify mouse/touch/pen: one-finger drags an object or pans,
-// two fingers pinch-zoom (also works with a mouse via the wheel / zoom buttons).
+// Pointer events unify mouse / touch / pen. A single pointer drags whatever is
+// under it — the ⊕ field-probe pin, a source object, or (on empty space) the
+// view (pan). Two pointers pinch-zoom. The wheel and zoom buttons also zoom.
 let dragMode = null, dragStart = null, dragObjStart = null;
 const pointers = new Map();
 let pinch = null;

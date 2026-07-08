@@ -38,6 +38,20 @@ N42 NdFeB) *is* the polarisation magnitude. Verified against: the ∇·B = 0 and
 ∇×B = 0 Maxwell constraints outside the magnet, and the point-dipole far-field
 limit B_z → 4abcJ/(πR³) on axis.
 
+## Sphere magnet — exact, everywhere
+
+A uniformly-magnetised sphere is one of the few bodies whose field is closed-form
+*inside and out*:
+
+- **Outside** it is **exactly** a point dipole with moment **m** = **M**·V,
+  V = 4⁄3 πR³.
+- **Inside** the field is perfectly uniform, **B** = ⅔**J** (with **J** = μ₀**M**).
+
+No discretisation, no approximation. The two expressions agree at the pole
+(⅔J on both sides), which the app shows as a continuous field across the surface.
+`src/sources.js` picks the interior or exterior form by comparing the probe
+distance to the radius.
+
 ## Currents — Biot–Savart for finite segments
 
 Any wire is broken into straight segments; each contributes the **exact**
@@ -95,6 +109,12 @@ the magnetic field, then a second half electric kick. It conserves energy for
 purely magnetic fields (the magnetic force does no work), so orbits stay closed
 over long runs. Verified against the analytic gyro-radius r = mv/(qB) and
 speed conservation.
+
+The integration step is **adaptive**: each sub-step is capped at
+dt ≤ T_gyro⁄24 where T_gyro = 2πm/(qB) is the local gyro-period. This keeps the
+orbit resolved (and therefore accurate) even close to a strong magnet, where a
+fixed step would otherwise be larger than a full gyration. Motion is
+non-relativistic (valid for the v ≪ c speeds used here).
 
 ## Visualisation caveats
 
