@@ -556,15 +556,21 @@ function pickSource(sx, sy) {
 }
 
 // ---- particle panel ----------------------------------------------------
-// Launch from the field-probe pin (or the left of the view if it's unset),
-// moving right (in the view plane), at the chosen speed.
+// Launch from the field-probe pin, heading in the direction its arrow points
+// (the in-plane field direction there). Falls back to the left of the view,
+// moving right, when the probe is unset or the field vanishes there.
 function launchParticle() {
   const type = document.getElementById('pType').value;
   const q = type === 'proton' ? P.QE : -P.QE;
   const mass = type === 'proton' ? P.MP : P.ME;
   const speed = Math.abs(parseFloat(document.getElementById('pSpeed').value)) || 3e6;
   const pos = probe ? probe.slice() : view.worldFromUV(view.center[0] - view.spanU * 0.4, view.center[1]);
-  const vel = [0, 0, 0]; vel[view.uAxis] = speed;
+  const dir = [0, 0, 0]; dir[view.uAxis] = 1;
+  if (probe) {
+    const B = scene.B(probe), cu = B[view.uAxis], cv = B[view.vAxis], m = Math.hypot(cu, cv);
+    if (m > 1e-30) { dir[view.uAxis] = cu / m; dir[view.vAxis] = cv / m; }
+  }
+  const vel = dir.map((c) => c * speed);
   particles.push({ x: pos, v: vel, q, mass, trail: [pos.slice()], color: q < 0 ? '#4aa3ff' : '#ff7a4a', alive: true });
   startSim();
 }
