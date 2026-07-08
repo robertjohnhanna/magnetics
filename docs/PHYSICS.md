@@ -81,9 +81,10 @@ Biot–Savart segments — much faster *and* exact. This drives:
   equivalent to a solenoid carrying bound surface current K = M = Br/μ₀, so it
   is a stack of loops, each slice of height dz carrying M·dz.
 
-The optional **core µ factor** on electromagnets is a simple linear multiplier
-standing in for a high-permeability core; it is an approximation (it ignores
-demagnetising factors and saturation) and is labelled as such in the UI.
+The optional **core (µ)** factor on electromagnets is a simple linear multiplier
+standing in for a high-permeability core. It is the one deliberate approximation
+in the source models (it ignores demagnetising factors and saturation); leave it
+at 1 for an air-core coil, which is exact.
 
 ## Point dipole and moving charges
 

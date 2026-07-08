@@ -31,8 +31,8 @@ export function defaultSource(type) {
     case 'magnet':   return { ...base, name: 'Bar magnet',    size: [10, 10, 20], Br: 1.30 };
     case 'cylinder': return { ...base, name: 'Disc magnet',   dia: 12, len: 6,   Br: 1.30, seg: 48 };
     case 'sphere':   return { ...base, name: 'Sphere magnet', dia: 12, Br: 1.30 };
-    case 'coil':     return { ...base, name: 'Electromagnet', dia: 20, len: 30,  turns: 200, current: 2.0, seg: 28, core: 1 };
-    case 'loop':     return { ...base, name: 'Current loop',  dia: 20, current: 10, seg: 96 };
+    case 'coil':     return { ...base, name: 'Electromagnet', dia: 20, len: 30,  turns: 200, current: 2.0, core: 1 };
+    case 'loop':     return { ...base, name: 'Current loop',  dia: 20, current: 10 };
     case 'wire':     return { ...base, name: 'Straight wire', len: 60, current: 20 };
     case 'dipole':   return { ...base, name: 'Dipole',        moment: 0.05 };
     case 'charge':   return { ...base, name: 'Moving charge', q: -1, vel: [0, 0, 1e6], speedScale: 1 };
@@ -239,7 +239,7 @@ export function forceOn(scene, target) {
     // Bound surface charge σ = M·n̂ lives on the two faces ⟂ magnetisation (local z).
     const M = target.Br / P.MU0;
     const a = mm(target.size[0]) / 2, b = mm(target.size[1]) / 2, cc = mm(target.size[2]) / 2;
-    const nx = 9, ny = 9, dA = (2 * a / nx) * (2 * b / ny);
+    const nx = 12, ny = 12, dA = (2 * a / nx) * (2 * b / ny);
     for (const [zf, sgn] of [[cc, 1], [-cc, -1]]) {
       for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
         const r = local([-a + (i + 0.5) * (2 * a / nx), -b + (j + 0.5) * (2 * b / ny), zf]);
@@ -249,7 +249,7 @@ export function forceOn(scene, target) {
     }
   } else if (target.type === 'cylinder') {
     const M = target.Br / P.MU0, rad = mm(target.dia) / 2, hl = mm(target.len) / 2;
-    const nr = 6, nth = 20;
+    const nr = 8, nth = 24;
     for (const [zf, sgn] of [[hl, 1], [-hl, -1]]) {
       for (let ir = 0; ir < nr; ir++) for (let it = 0; it < nth; it++) {
         const rr = rad * (ir + 0.5) / nr, th = 2 * Math.PI * (it + 0.5) / nth;

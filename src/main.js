@@ -111,7 +111,10 @@ function drawLegend() {
   const py = Math.max(6, view.H - panelH - 10);
   const x = px + pad, gy = py + 18;
   ctx.fillStyle = 'rgba(10,12,18,0.66)';
-  ctx.beginPath(); ctx.roundRect(px, py, panelW, panelH, 6); ctx.fill();
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(px, py, panelW, panelH, 6);
+  else ctx.rect(px, py, panelW, panelH);          // Safari ≤ 15 has no roundRect
+  ctx.fill();
   ctx.fillStyle = '#cdd3dd'; ctx.font = '10px system-ui'; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
   ctx.fillText('|B| (log)', x, py + 12);
   const grad = ctx.createLinearGradient(x, 0, x + w, 0);
@@ -149,6 +152,7 @@ function simStep() {
   const fieldFn = (x) => scene.EB(x);
   const frameTime = simDt * stepsPerFrame;         // sim-seconds advanced per frame
   const trailGap = view.spanU * 0.004;
+  const cw = view.worldFromUV(view.center[0], view.center[1]);  // cull relative to the view, not the origin
   for (const p of particles) {
     if (!p.alive) continue;
     let tacc = 0, sub = 0;
@@ -164,7 +168,7 @@ function simStep() {
       p.x = r.x; p.v = r.v; tacc += dt; sub++;
       const last = p.trail[p.trail.length - 1];
       if (!last || Math.hypot(p.x[0] - last[0], p.x[1] - last[1], p.x[2] - last[2]) > trailGap) p.trail.push(p.x);
-      if (P.vlen(p.x) > view.spanU * 6) { p.alive = false; break; }
+      if (P.vlen(P.vsub(p.x, cw)) > view.spanU * 6) { p.alive = false; break; }
     }
     if (p.trail.length > 6000) p.trail.splice(0, p.trail.length - 6000);
   }
@@ -215,7 +219,7 @@ const paramDefs = {
     ['Len (mm)', 'len', 1, 200, 0.5],
     ['Turns', 'turns', 1, 5000, 1],
     ['Current (A)', 'current', -50, 50, 0.1],
-    ['Core µ', 'core', 1, 5000, 1],
+    ['Core (µ)', 'core', 1, 5000, 1],
   ],
   loop: [
     ['Dia (mm)', 'dia', 2, 120, 0.5],
@@ -256,7 +260,10 @@ function buildInspector() {
   const addRow = (label, path, min, max, step) => {
     const row = document.createElement('label'); row.className = 'row';
     const val = getPath(s, path);
-    row.innerHTML = `<span>${label}</span>`;
+    // keep unit strings like (mm), (T), (A·m²), (µ) in their true case —
+    // the label text itself is uppercased by CSS
+    const m = label.match(/^(.*?)\s*\((.+)\)$/);
+    row.innerHTML = m ? `<span>${m[1]} <span class="lc">(${m[2]})</span></span>` : `<span>${label}</span>`;
     const input = document.createElement('input');
     input.type = 'number'; input.value = val; input.step = step; input.min = min; input.max = max;
     input.addEventListener('input', () => {
@@ -380,7 +387,11 @@ planeSel.addEventListener('change', () => {
   invalidateField();
 });
 const sliceInput = document.getElementById('sliceInput');
-sliceInput.addEventListener('input', () => { view.slice = parseFloat(sliceInput.value) / 1000; invalidateField(); });
+sliceInput.addEventListener('input', () => {
+  const v = parseFloat(sliceInput.value);
+  if (!isFinite(v)) return;               // empty/partial input must not poison the field with NaN
+  view.slice = v / 1000; invalidateField();
+});
 const unitSel = document.getElementById('unitSel');
 for (const u of Object.keys(UNITS)) unitSel.innerHTML += `<option>${u}</option>`;
 unitSel.value = fieldUnit;
@@ -526,6 +537,8 @@ window.addEventListener('keydown', (e) => {
 // clear-all button
 document.getElementById('clearAll').addEventListener('click', () => {
   scene.sources = []; selectedId = null; particles.length = 0; simRunning = false;
+  document.getElementById('pauseSim').textContent = 'Pause';
+  document.getElementById('partReadout').textContent = 'Launch a particle';
   buildList(); buildInspector(); invalidateField();
 });
 
@@ -615,6 +628,7 @@ for (const name of Object.keys(presets)) presetSel.innerHTML += `<option value="
 presetSel.addEventListener('change', () => {
   if (!presets[presetSel.value]) return;
   particles.length = 0; simRunning = false;
+  document.getElementById('pauseSim').textContent = 'Pause';
   presets[presetSel.value]();
   scene.rebuild(); selectedId = scene.sources[0] ? scene.sources[0].id : null;
   presetSel.value = ''; buildList(); buildInspector(); invalidateField();
