@@ -159,6 +159,53 @@ export function polylineField(points, I, Q) {
 }
 
 // ---------------------------------------------------------------------------
+// Complete elliptic integrals K(m), E(m) (parameter m = k²) via the
+// arithmetic–geometric mean.  Fast and accurate for 0 ≤ m < 1.
+// ---------------------------------------------------------------------------
+export function ellipKE(m) {
+  if (m < 0) m = 0;
+  if (m > 1 - 1e-12) m = 1 - 1e-12;
+  let a = 1, b = Math.sqrt(1 - m), c = Math.sqrt(m);
+  let s = 0.5 * c * c;      // n = 0 term: 2^{-1} c₀²
+  let twoPow = 1;
+  for (let n = 1; n <= 14; n++) {
+    const a1 = (a + b) / 2, b1 = Math.sqrt(a * b), c1 = (a - b) / 2;
+    a = a1; b = b1; c = c1;
+    twoPow *= 2;
+    s += (twoPow / 2) * c * c;
+    if (c < 1e-14) break;
+  }
+  const K = Math.PI / (2 * a);
+  return [K, K * (1 - s)];
+}
+
+// ---------------------------------------------------------------------------
+// Exact field of a circular current loop — radius a, current I, lying in the
+// z = 0 plane centred at the origin — evaluated at a local point (x, y, z).
+// Uses the closed-form elliptic-integral solution (Simpson et al. / Jackson).
+// One evaluation replaces dozens of Biot–Savart segments: much faster and exact.
+// ---------------------------------------------------------------------------
+export function circularLoopField(a, I, x, y, z) {
+  const rho = Math.hypot(x, y);
+  const C = MU0 * I / Math.PI;
+  const sum = a * a + rho * rho + z * z;
+  let alpha2 = sum - 2 * a * rho;
+  const beta2 = sum + 2 * a * rho;
+  const beta = Math.sqrt(beta2) || 1e-30;
+  if (alpha2 < 1e-20) alpha2 = 1e-20;            // guard exactly on the wire
+  const k2 = 1 - alpha2 / beta2;
+  const [K, E] = ellipKE(k2);
+  const Bz = C * ((a * a - rho * rho - z * z) * E + alpha2 * K) / (2 * alpha2 * beta);
+  let Brho = 0;
+  if (rho > 1e-12) {
+    Brho = C * z * ((a * a + rho * rho + z * z) * E - alpha2 * K) / (2 * alpha2 * beta * rho);
+  }
+  const bx = rho > 1e-12 ? Brho * x / rho : 0;
+  const by = rho > 1e-12 ? Brho * y / rho : 0;
+  return [bx, by, Bz];
+}
+
+// ---------------------------------------------------------------------------
 // Point magnetic dipole.  m = magnetic moment [A·m²] at origin r0.
 //   B(r) = (μ0/4π) [ 3 r̂ (m·r̂) − m ] / r³
 // ---------------------------------------------------------------------------

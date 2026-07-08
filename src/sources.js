@@ -53,54 +53,43 @@ export function buildSource(s) {
   const origin = [mm(s.pos[0]), mm(s.pos[1]), mm(s.pos[2])];
   s._R = R;
   s._origin = origin;
-  s._segments = null;   // array of { pts:[world...], I } for current sources
+  s._segments = null;   // straight-wire filaments: [{ pts:[world…], I }]
+  s._loops = null;      // circular loops in LOCAL frame: [{ z, I }] with radius s._loopR
+  s._loopR = 0;
 
   const toWorld = (local) => P.vadd(origin, P.matVec(R, local));
 
-  if (s.type === 'coil' || s.type === 'cylinder' || s.type === 'loop' || s.type === 'wire') {
-    s._segments = [];
-  }
-
+  // Circular current sources (loop / electromagnet / cylinder magnet) are
+  // modelled as one or more coaxial circular loops evaluated with the exact
+  // elliptic-integral formula — far faster and more accurate than polygonising
+  // each turn into Biot–Savart segments.
   if (s.type === 'loop') {
-    const r = mm(s.dia) / 2;
-    s._segments.push({ pts: ring(r, 0, s.seg, toWorld), I: s.current });
+    s._loopR = mm(s.dia) / 2;
+    s._loops = [{ z: 0, I: s.current }];
   } else if (s.type === 'coil') {
-    // Electromagnet: sample the solenoid with a manageable number of loops,
-    // each carrying current * (turns / samples) so total ampere-turns is exact.
-    const r = mm(s.dia) / 2, L = mm(s.len);
-    // Segment budget capped for interactive field evaluation: ~26 loops × 16-gon
-    // rings reproduce the solenoid field to well under 1% a few mm outside.
-    const samples = Math.max(6, Math.min(26, s.turns));
+    // Electromagnet: stack of loops whose total ampere-turns (turns × current)
+    // is preserved. Elliptic loops are cheap, so we can use plenty of them.
+    const L = mm(s.len);
+    const samples = Math.max(4, Math.min(40, s.turns));
     const Iloop = s.current * s.turns / samples * (s.core || 1);
-    for (let i = 0; i < samples; i++) {
-      const z = -L / 2 + L * (i + 0.5) / samples;
-      s._segments.push({ pts: ring(r, z, 16, toWorld), I: Iloop });
-    }
+    s._loopR = mm(s.dia) / 2;
+    s._loops = [];
+    for (let i = 0; i < samples; i++) s._loops.push({ z: -L / 2 + L * (i + 0.5) / samples, I: Iloop });
   } else if (s.type === 'cylinder') {
-    // Uniformly magnetised cylinder ≡ solenoid of bound surface current K = M = Br/μ0.
-    // A slice of height dz carries current K·dz (azimuthal).  Sum stacked loops.
-    const r = mm(s.dia) / 2, L = mm(s.len);
+    // Uniformly magnetised cylinder ≡ solenoid of bound surface current K = M.
+    // Each slice of height dz carries current M·dz (azimuthal).
+    const L = mm(s.len);
     const M = s.Br / P.MU0;                 // magnetisation [A/m]
-    const samples = Math.max(8, Math.min(26, s.seg));
+    const samples = Math.max(6, Math.min(48, s.seg));
     const Iloop = M * (L / samples);
-    for (let i = 0; i < samples; i++) {
-      const z = -L / 2 + L * (i + 0.5) / samples;
-      s._segments.push({ pts: ring(r, z, 16, toWorld), I: Iloop });
-    }
+    s._loopR = mm(s.dia) / 2;
+    s._loops = [];
+    for (let i = 0; i < samples; i++) s._loops.push({ z: -L / 2 + L * (i + 0.5) / samples, I: Iloop });
   } else if (s.type === 'wire') {
     const L = mm(s.len);
-    s._segments.push({ pts: [toWorld([0, 0, -L / 2]), toWorld([0, 0, L / 2])], I: s.current });
+    s._segments = [{ pts: [toWorld([0, 0, -L / 2]), toWorld([0, 0, L / 2])], I: s.current }];
   }
   return s;
-}
-
-function ring(r, z, n, toWorld) {
-  const pts = [];
-  for (let i = 0; i <= n; i++) {
-    const t = 2 * Math.PI * i / n;
-    pts.push(toWorld([r * Math.cos(t), r * Math.sin(t), z]));
-  }
-  return pts;
 }
 
 // Field of a single source at world point Q -> { B:[3], E:[3] }.
@@ -132,6 +121,17 @@ export function sourceField(s, Q) {
     const q = s.q * P.QE;
     const f = P.movingChargeField(q, s._origin, vel, Q);
     B = f.B; E = f.E;
+  } else if (s._loops) {
+    // Coaxial circular loops (loop / coil / cylinder) — evaluate each in the
+    // source's local frame with the exact elliptic-integral solution.
+    const q = P.matTVec(s._R, P.vsub(Q, s._origin));
+    const a = s._loopR;
+    let bx = 0, by = 0, bz = 0;
+    for (const lp of s._loops) {
+      const bl = P.circularLoopField(a, lp.I, q[0], q[1], q[2] - lp.z);
+      bx += bl[0]; by += bl[1]; bz += bl[2];
+    }
+    B = P.matVec(s._R, [bx, by, bz]);
   } else if (s._segments) {
     for (const seg of s._segments) B = P.vadd(B, P.polylineField(seg.pts, seg.I, Q));
   }

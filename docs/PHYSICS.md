@@ -62,19 +62,24 @@ B = (μ₀I)/(4π d) · (cosθ₁ − cosθ₂) · n̂
 ```
 
 where *d* is the perpendicular distance to the line, θ are the angles subtended
-at the endpoints, and **n̂** is the right-hand-rule direction. This reproduces
-*any* geometry:
+at the endpoints, and **n̂** is the right-hand-rule direction. A **straight
+wire** is a single such segment (verified against the infinite-wire limit
+B = μ₀I/(2πd)).
 
-- **Straight wire** — one segment. Verified against the infinite-wire limit
-  B = μ₀I/(2πd).
-- **Current loop** — a polygon of segments. Verified against the on-axis
-  formula B_z = μ₀IR²/2(R²+z²)^{3/2}.
-- **Electromagnet (solenoid)** — the coil is sampled as a stack of loops whose
-  total ampere-turns (turns × current) is preserved. Verified against
-  μ₀nI at the centre of a long solenoid.
+**Circular loops** use a faster, exact route. The field of a circular current
+loop is known in closed form via the complete elliptic integrals K and E
+(evaluated by the arithmetic–geometric mean). One evaluation replaces dozens of
+Biot–Savart segments — much faster *and* exact. This drives:
+
+- **Current loop** — a single loop. Verified against the on-axis formula
+  B_z = μ₀IR²/2(R²+z²)^{3/2} and, off-axis, against a 1024-segment Biot–Savart
+  loop.
+- **Electromagnet (solenoid)** — a stack of coaxial loops whose total
+  ampere-turns (turns × current) is preserved. Verified against μ₀nI at the
+  centre of a long solenoid.
 - **Cylinder / disc magnet** — a uniformly-magnetised cylinder is *exactly*
-  equivalent to a solenoid carrying bound surface current K = M = Br/μ₀. It is
-  modelled as stacked loops, each slice of height dz carrying M·dz.
+  equivalent to a solenoid carrying bound surface current K = M = Br/μ₀, so it
+  is a stack of loops, each slice of height dz carrying M·dz.
 
 The optional **core µ factor** on electromagnets is a simple linear multiplier
 standing in for a high-permeability core; it is an approximation (it ignores

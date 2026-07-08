@@ -314,14 +314,17 @@ export class Renderer {
     this.poleLabels(s, d);
   }
 
-  poleLabels(s, d) {
+  // Label the magnetic poles along the local +z axis. `flip` swaps N/S (used
+  // for coils/loops whose polarity follows the current direction).
+  poleLabels(s, d, flip = false) {
     const ctx = this.ctx;
-    const n = this.localToScreen(s, [0, 0, d / 2]);
-    const sp = this.localToScreen(s, [0, 0, -d / 2]);
+    const pPos = this.localToScreen(s, [0, 0, d / 2]);   // local +z end
+    const pNeg = this.localToScreen(s, [0, 0, -d / 2]);
     ctx.font = '800 14px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.lineWidth = 3.5; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(0,0,0,0.9)'; ctx.fillStyle = '#fff';
-    ctx.strokeText('N', n[0], n[1]); ctx.fillText('N', n[0], n[1]);
-    ctx.strokeText('S', sp[0], sp[1]); ctx.fillText('S', sp[0], sp[1]);
+    const posLabel = flip ? 'S' : 'N', negLabel = flip ? 'N' : 'S';
+    ctx.strokeText(posLabel, pPos[0], pPos[1]); ctx.fillText(posLabel, pPos[0], pPos[1]);
+    ctx.strokeText(negLabel, pNeg[0], pNeg[1]); ctx.fillText(negLabel, pNeg[0], pNeg[1]);
   }
 
   drawSphere(s, sel) {
@@ -369,6 +372,8 @@ export class Renderer {
     const b = this.localToScreen(s, [0, 0, L / 2 + 3]);
     ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+    // poles: right-hand rule puts N at the +z end for positive current
+    if (s.current !== 0) this.poleLabels(s, s.len + 8, s.current < 0);
   }
 
   drawLoop(s, sel) {
@@ -378,6 +383,7 @@ export class Renderer {
     ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
     ctx.fillStyle = ctx.strokeStyle;
     for (const p of [a, b]) { ctx.beginPath(); ctx.arc(p[0], p[1], 3, 0, 7); ctx.fill(); }
+    if (s.current !== 0) this.poleLabels(s, Math.max(12, s.dia * 0.7), s.current < 0);
   }
 
   drawWire(s, sel) {

@@ -109,6 +109,27 @@ console.log('\n== Circular loop from segments (on-axis) ==');
   check('loop on-axis transverse ≈ 0', Math.abs(b[0]) < 1e-9 && Math.abs(b[1]) < 1e-9, b.toString());
 }
 
+console.log('\n== Circular loop — elliptic-integral form ==');
+{
+  const Rr = 0.05, I = 3;
+  // on-axis vs closed form
+  for (const z of [0.01, 0.08, 0.2]) {
+    const b = circularLoopField(Rr, I, 0, 0, z);
+    const exp = MU0 * I * Rr * Rr / (2 * Math.pow(Rr * Rr + z * z, 1.5));
+    check(`loop on-axis Bz (z=${z})`, rel(b[2], exp) < 1e-6, `${b[2]} vs ${exp}`);
+  }
+  // off-axis vs a 1024-segment Biot–Savart loop (independent method)
+  const N = 1024, pts = [];
+  for (let i = 0; i <= N; i++) { const t = 2 * Math.PI * i / N; pts.push([Rr * Math.cos(t), Rr * Math.sin(t), 0]); }
+  for (const Q of [[0.03, 0, 0.02], [0.06, 0.01, -0.03], [0.02, 0.02, 0.05]]) {
+    const bE = circularLoopField(Rr, I, Q[0], Q[1], Q[2]);
+    const bS = polylineField(pts, I, Q);
+    check(`loop off-axis matches segments @${Q}`, vlen(vsub(bE, bS)) / vlen(bS) < 2e-3,
+          `E=${bE.map((v)=>v.toExponential(2))} S=${bS.map((v)=>v.toExponential(2))}`);
+  }
+}
+import { circularLoopField } from '../src/physics.js';
+
 console.log('\n== Point dipole ==');
 {
   // On-axis (moment along z): Bz = μ0/(2π) m / r³ ; transverse plane: -μ0/(4π) m/r³.
