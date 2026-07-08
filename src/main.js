@@ -95,10 +95,13 @@ function drawProbe() {
   ctx.beginPath(); ctx.arc(s[0], s[1], 9, 0, 7); ctx.stroke();
   ctx.beginPath(); ctx.arc(s[0], s[1], 2.5, 0, 7); ctx.fill();
   // test-work cycle loop (dashed) — the closed path the "Continuous work" tile
-  // integrates the magnetic force around
-  const rpx = workLoopRadius() * view.scale;
+  // integrates the magnetic force around. Red if it crosses a source (invalid).
+  const R = workLoopRadius();
+  const rpx = R * view.scale;
+  const blocked = loopHitsSolid(probe, R);
   ctx.save();
-  ctx.setLineDash([5, 4]); ctx.lineWidth = 1.3; ctx.strokeStyle = 'rgba(255,210,74,0.6)';
+  ctx.setLineDash([5, 4]); ctx.lineWidth = 1.3;
+  ctx.strokeStyle = blocked ? 'rgba(230,72,61,0.85)' : 'rgba(255,210,74,0.6)';
   ctx.beginPath(); ctx.arc(s[0], s[1], rpx, 0, 7); ctx.stroke();
   ctx.restore();
   const u = UNITS[fieldUnit], dp = Math.abs(mag * u) >= 100 ? 0 : 1;
@@ -120,35 +123,76 @@ function drawProbe() {
 const WORK_R_FRAC = 0.13;         // loop radius as a fraction of the view span
 const TEST_M = 0.13;              // test moment [A·m²] ≈ a 5 mm N42 magnet
 function workLoopRadius() { return Math.max(1e-4, view.spanU * WORK_R_FRAC); }
-function computeCycleWork() {
-  if (!probe || !scene.sources.length) return null;
-  const N = 128, R = workLoopRadius();
+
+// The theorem ∮F·dl = 0 holds only where the test magnet stays in FREE SPACE.
+// Inside solid magnetised material the field is discontinuous (nonzero curl at
+// bound-current surfaces) and the "carry a test magnet through here" scenario is
+// unphysical — there the integral converges to a *wrong*, nonzero value. So we
+// hard-refuse any loop whose path enters a magnet/sphere/cylinder body. (Near a
+// current filament the integral is merely slow to converge, which the
+// resolution check below catches, so those don't need a hard refusal.)
+const _mm = (v) => v / 1000;
+function pointInSolid(q, s) {
+  if (s.type === 'sphere') return P.vlen(P.vsub(q, s._origin)) < _mm(s.dia) / 2;
+  if (s.type === 'magnet') {
+    const l = P.matTVec(s._R, P.vsub(q, s._origin));
+    return Math.abs(l[0]) < _mm(s.size[0]) / 2 && Math.abs(l[1]) < _mm(s.size[1]) / 2 && Math.abs(l[2]) < _mm(s.size[2]) / 2;
+  }
+  if (s.type === 'cylinder') {
+    const l = P.matTVec(s._R, P.vsub(q, s._origin));
+    return Math.hypot(l[0], l[1]) < _mm(s.dia) / 2 && Math.abs(l[2]) < _mm(s.len) / 2;
+  }
+  return false;   // coil bore / wire / dipole / charge: not solid material
+}
+function loopHitsSolid(center, R) {
+  const uA = view.uAxis, vA = view.vAxis, M = 60;
+  for (let i = 0; i < M; i++) {
+    const th = 2 * Math.PI * i / M;
+    const q = center.slice(); q[uA] = center[uA] + R * Math.cos(th); q[vA] = center[vA] + R * Math.sin(th);
+    for (const s of scene.sources) if (s.visible && pointInSolid(q, s)) return s;
+  }
+  return null;
+}
+// Work integral ∮F·dl for a freely-aligning test magnet (U = −m·|B|,
+// F = m·∇|B|) around the loop, at resolution N. Returns { W, dU }.
+function loopIntegral(center, R, N) {
   const uA = view.uAxis, vA = view.vAxis;
   const h = Math.max(1e-6, R * 1e-3);
   const bmag = (q) => P.vlen(scene.B(q));
-  const at = (th) => { const q = probe.slice(); q[uA] = probe[uA] + R * Math.cos(th); q[vA] = probe[vA] + R * Math.sin(th); return q; };
+  const at = (th) => { const q = center.slice(); q[uA] = center[uA] + R * Math.cos(th); q[vA] = center[vA] + R * Math.sin(th); return q; };
   let W = 0, bMin = Infinity, bMax = -Infinity, prev = at(0);
   for (let i = 1; i <= N; i++) {
     const cur = at(2 * Math.PI * i / N);
     const mid = [(prev[0] + cur[0]) / 2, (prev[1] + cur[1]) / 2, (prev[2] + cur[2]) / 2];
-    // force component (in plane) = m·∇|B| at the segment midpoint
     for (const ax of [uA, vA]) {
       const a = mid.slice(), b = mid.slice(); a[ax] += h; b[ax] -= h;
-      const F = TEST_M * (bmag(a) - bmag(b)) / (2 * h);
-      W += F * (cur[ax] - prev[ax]);
+      W += TEST_M * (bmag(a) - bmag(b)) / (2 * h) * (cur[ax] - prev[ax]);
     }
     const bc = bmag(cur); if (bc < bMin) bMin = bc; if (bc > bMax) bMax = bc;
     prev = cur;
   }
-  const dU = TEST_M * (bMax - bMin);      // one-stroke energy available
-  return { W, dU, R };
+  return { W, dU: TEST_M * (bMax - bMin) };
+}
+function computeCycleWork() {
+  if (!probe || !scene.sources.length) return null;
+  const R = workLoopRadius();
+  if (loopHitsSolid(probe, R)) return { blocked: true };
+  // evaluate at two resolutions to confirm the integral has converged
+  const lo = loopIntegral(probe, R, 160);
+  const hi = loopIntegral(probe, R, 320);
+  return { W: hi.W, dU: hi.dU, gap: Math.abs(hi.W - lo.W), R };
 }
 function updateWorkTile() {
   const el = document.getElementById('workReadout');
   const r = computeCycleWork();
   if (!r) { el.textContent = 'Add sources; drag the ⊕ pin'; return; }
-  const ratio = r.dU > 0 ? Math.abs(r.W) / r.dU : 0;
-  const verdict = ratio < 5e-3 ? 'balanced — no free energy' : 'residual (numerical)';
+  if (r.blocked) { el.innerHTML = '<div>Loop path crosses a source.</div><div class="hint">move the ⊕ pin to open space</div>'; return; }
+  if (r.dU <= 0) { el.innerHTML = '<div>Field is uniform on the loop</div><div class="hint">∮F·dl = 0</div>'; return; }
+  const ratio = Math.abs(r.W) / r.dU;
+  // The residual should vanish as the loop is refined; if the two resolutions
+  // still disagree, we're under-resolved rather than measuring a real effect.
+  const converged = r.gap < 1e-2 * r.dU;
+  const verdict = !converged ? 'under-resolved — refine' : (ratio < 1e-2 ? 'balanced — no continuous work' : 'residual (numerical)');
   el.innerHTML =
     `<div><b>Cycle</b> ∮F·dl ${r.W.toExponential(2)} J</div>` +
     `<div><b>1-stroke</b> ΔU ${r.dU.toExponential(2)} J</div>` +

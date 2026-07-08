@@ -129,6 +129,19 @@ work would show a nonzero integral here; none can, because the field is a
 gradient. (Continuous power is only possible with *time-varying* fields —
 induction/generators — which take in as much work as they deliver.)
 
+**Validity and safeguards.** The theorem only holds where the test magnet stays
+in **free space**. *Inside* solid magnetised material the field is discontinuous
+(bound-current surfaces carry ∇×B ≠ 0) and the scenario is unphysical, so the
+integral there converges to a spurious nonzero value. The tool therefore
+**refuses** any loop whose path enters a magnet/sphere/cylinder body (the loop is
+drawn red and the tile says so) instead of reporting a false result. Near a
+current filament the integral is real but slow to converge, so the tile also
+evaluates at two resolutions and reports **"under-resolved — refine"** if they
+disagree. Only when the path is clean and converged does it report the (≈ 0)
+cyclic work — with the one-stroke ΔU shown alongside to prove real forces are
+present but net to zero. This makes the check a genuine test, not a rubber stamp:
+it will not hand back "0" for a path where the number would be meaningless.
+
 ## Charged-particle dynamics — Boris pusher
 
 Particles move under the full Lorentz force **F = q(E + v×B)**. Integration uses
