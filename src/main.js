@@ -90,8 +90,20 @@ function invalidateField() { gridDirty = true; updateForceTile(); requestFrame()
 function invalidateLayers() { layersDirty = true; requestFrame(); }
 
 // ---- probe overlay -----------------------------------------------------
+// Keep the probe pin (and its shooter reach) inside the viewport, so panning or
+// zooming never loses it — it slides along the edge instead of vanishing.
+function clampProbe() {
+  if (!probe) return;
+  const m = (AIM_LEN + 14) / view.scale;         // world-space margin for pin + shooter
+  const cu = view.center[0], cv = view.center[1], hu = view.spanU / 2, hv = view.spanV / 2;
+  let u = probe[view.uAxis], v = probe[view.vAxis];
+  u = hu > m ? Math.min(cu + hu - m, Math.max(cu - hu + m, u)) : cu;
+  v = hv > m ? Math.min(cv + hv - m, Math.max(cv - hv + m, v)) : cv;
+  probe = view.worldFromUV(u, v);
+}
 function drawProbe() {
   if (!probe) return;
+  clampProbe();
   const ctx = renderer.ctx;
   const s = view.toScreen(probe);
   const B = scene.B(probe);
