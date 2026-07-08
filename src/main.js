@@ -556,14 +556,14 @@ function pickSource(sx, sy) {
 }
 
 // ---- particle panel ----------------------------------------------------
-// Launch from the left of the current view, moving right (in the view plane),
-// at the chosen speed — no fiddly position/velocity fields needed.
+// Launch from the field-probe pin (or the left of the view if it's unset),
+// moving right (in the view plane), at the chosen speed.
 function launchParticle() {
   const type = document.getElementById('pType').value;
   const q = type === 'proton' ? P.QE : -P.QE;
   const mass = type === 'proton' ? P.MP : P.ME;
   const speed = Math.abs(parseFloat(document.getElementById('pSpeed').value)) || 3e6;
-  const pos = view.worldFromUV(view.center[0] - view.spanU * 0.4, view.center[1]);
+  const pos = probe ? probe.slice() : view.worldFromUV(view.center[0] - view.spanU * 0.4, view.center[1]);
   const vel = [0, 0, 0]; vel[view.uAxis] = speed;
   particles.push({ x: pos, v: vel, q, mass, trail: [pos.slice()], color: q < 0 ? '#4aa3ff' : '#ff7a4a', alive: true });
   startSim();
