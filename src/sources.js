@@ -219,3 +219,17 @@ export function momentOf(s) {
   }
   return null;
 }
+
+// Approximate physical half-extent of a source [m] — its bounding-sphere radius
+// about the centre. Used for click hit-testing, the selection highlight, and Fit.
+export function sourceExtent(s) {
+  switch (s.type) {
+    case 'magnet':   return 0.5 * Math.hypot(mm(s.size[0]), mm(s.size[1]), mm(s.size[2]));
+    case 'sphere':   return mm(s.dia) / 2;
+    case 'cylinder':
+    case 'coil':     return Math.max(mm(s.dia) / 2, mm(s.len) / 2);
+    case 'loop':     return mm(s.dia) / 2;
+    case 'wire':     return mm(s.len) / 2;
+    default:         return 0.006;  // dipole / charge — small point marker
+  }
+}

@@ -4,6 +4,7 @@
 // per-frame drawing (during particle animation) just blits that layer and adds
 // lightweight overlays (sources, particles, probe).
 import * as P from './physics.js';
+import { sourceExtent } from './sources.js';
 
 // Compact viridis colour ramp (control points), interpolated in sRGB.
 const VIRIDIS = [
@@ -252,11 +253,25 @@ export class Renderer {
   // ---- overlays (drawn to visible ctx each frame) ----
   blitField() { this.ctx.drawImage(this.field, 0, 0, this.view.W, this.view.H); }
 
+  // Glowing accent ring around the selected object, so it's obvious which one
+  // the inspector is editing.
+  drawSelection(s) {
+    const ctx = this.ctx;
+    const c = this.view.toScreen(s._origin);
+    const r = Math.max(13, sourceExtent(s) * this.view.scale) + 6;
+    ctx.save();
+    ctx.strokeStyle = '#4aa3ff'; ctx.lineWidth = 2.5;
+    ctx.shadowColor = '#4aa3ff'; ctx.shadowBlur = 9;
+    ctx.beginPath(); ctx.arc(c[0], c[1], r, 0, 7); ctx.stroke();
+    ctx.restore();
+  }
+
   drawSources(selectedId) {
     const ctx = this.ctx;
     for (const s of this.scene.sources) {
       if (!s.visible) continue;
       const sel = s.id === selectedId;
+      if (sel) this.drawSelection(s);
       ctx.save();
       if (s.type === 'magnet') this.drawMagnet(s, sel);
       else if (s.type === 'sphere') this.drawSphere(s, sel);

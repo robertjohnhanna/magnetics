@@ -1,6 +1,6 @@
 // main.js — app glue: scene management, UI panels, interaction, particle sim.
 import * as P from './physics.js';
-import { Scene, defaultSource, buildSource, momentOf, MATERIALS } from './sources.js';
+import { Scene, defaultSource, buildSource, momentOf, sourceExtent, MATERIALS } from './sources.js';
 import { Renderer, View } from './render.js';
 
 const scene = new Scene();
@@ -397,20 +397,6 @@ document.getElementById('zoomIn').addEventListener('click', () => zoomBy(1 / 1.3
 document.getElementById('zoomOut').addEventListener('click', () => zoomBy(1.3, view.W / 2, view.H / 2));
 document.getElementById('zoomReset').addEventListener('click', () => { view.spanU = 0.16; view.center = [0, 0]; invalidateField(); });
 document.getElementById('zoomFit').addEventListener('click', fitView);
-// Approximate physical half-extent of a source [m], so Fit frames its actual
-// size (a big sphere fills the view), not just its centre point.
-function sourceExtent(s) {
-  const M = (v) => v / 1000;
-  switch (s.type) {
-    case 'magnet':   return 0.5 * Math.hypot(M(s.size[0]), M(s.size[1]), M(s.size[2]));
-    case 'sphere':   return M(s.dia) / 2;
-    case 'cylinder':
-    case 'coil':     return Math.max(M(s.dia) / 2, M(s.len) / 2);
-    case 'loop':     return M(s.dia) / 2;
-    case 'wire':     return M(s.len) / 2;
-    default:         return 0.006;
-  }
-}
 function fitView() {
   const vis = scene.sources.filter((s) => s.visible);
   if (!vis.length) return;
@@ -448,7 +434,7 @@ canvas.addEventListener('pointerdown', (e) => {
   }
   const hit = pickSource(sx, sy);
   if (hit) {
-    if (hit.id !== selectedId) { selectedId = hit.id; buildList(); buildInspector(); }
+    if (hit.id !== selectedId) { selectedId = hit.id; buildList(); buildInspector(); requestDraw(); }
     dragMode = 'obj'; dragStart = [sx, sy]; dragObjStart = hit.pos.slice();
     canvas.style.cursor = 'grabbing';
   } else {
@@ -523,11 +509,15 @@ document.getElementById('clearAll').addEventListener('click', () => {
   buildList(); buildInspector(); invalidateField();
 });
 
+// Hit-test in screen space: a click anywhere within an object's projected
+// footprint selects it (min 14 px so tiny objects stay grabbable). Front-most
+// (last-added) object wins.
 function pickSource(sx, sy) {
   for (let i = scene.sources.length - 1; i >= 0; i--) {
     const s = scene.sources[i]; if (!s.visible) continue;
     const p = view.toScreen(s._origin);
-    if (Math.hypot(p[0] - sx, p[1] - sy) < 22) return s;
+    const r = Math.max(14, sourceExtent(s) * view.scale);
+    if (Math.hypot(p[0] - sx, p[1] - sy) < r) return s;
   }
   return null;
 }
