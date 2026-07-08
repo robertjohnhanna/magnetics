@@ -129,6 +129,12 @@ orbit resolved (and therefore accurate) even close to a strong magnet, where a
 fixed step would otherwise be larger than a full gyration. Motion is
 non-relativistic (valid for the v ≪ c speeds used here).
 
+A particle that flies into a **solid magnet body** (bar, disc/cylinder or
+sphere) is **stopped/absorbed** at the point of impact — the magnet is a fixed
+laboratory object, so it takes up the particle's momentum without visibly
+recoiling. Open current sources (coils, loops, wires) are not solid barriers, so
+a particle still spirals freely through a solenoid's bore.
+
 ## Visualisation caveats
 
 - The canvas shows a **2-D slice** through the 3-D scene. Streamlines trace the

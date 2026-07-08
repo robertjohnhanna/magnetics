@@ -174,7 +174,7 @@ export class Scene {
 }
 
 // True if world point q lies inside the solid magnetised body of source s.
-function bodyContains(s, q) {
+export function bodyContains(s, q) {
   if (s.type === 'sphere') return P.vlen(P.vsub(q, s._origin)) < mm(s.dia) / 2;
   if (s.type === 'magnet') {
     const l = P.matTVec(s._R, P.vsub(q, s._origin));

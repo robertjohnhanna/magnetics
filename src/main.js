@@ -1,6 +1,6 @@
 // main.js — app glue: scene management, UI panels, interaction, particle sim.
 import * as P from './physics.js';
-import { Scene, defaultSource, buildSource, sourceExtent, MATERIALS } from './sources.js';
+import { Scene, defaultSource, buildSource, sourceExtent, bodyContains, MATERIALS } from './sources.js';
 import { Renderer, View } from './render.js';
 
 const scene = new Scene();
@@ -165,10 +165,10 @@ function drawParticles() {
       i ? ctx.lineTo(s[0], s[1]) : ctx.moveTo(s[0], s[1]);
     }
     ctx.stroke();
-    if (p.alive) {
-      const s = view.toScreen(p.x);
-      ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(s[0], s[1], 4, 0, 7); ctx.fill();
-    }
+    const s = view.toScreen(p.x);
+    ctx.fillStyle = p.alive ? p.color : '#8a8f98';
+    ctx.beginPath(); ctx.arc(s[0], s[1], 4, 0, 7); ctx.fill();
+    if (!p.alive) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.stroke(); }   // struck / lost
   }
 }
 function simStep() {
@@ -191,6 +191,10 @@ function simStep() {
       p.x = r.x; p.v = r.v; tacc += dt; sub++;
       const last = p.trail[p.trail.length - 1];
       if (!last || Math.hypot(p.x[0] - last[0], p.x[1] - last[1], p.x[2] - last[2]) > trailGap) p.trail.push(p.x);
+      // Struck a solid magnet body → the particle is stopped/absorbed at impact.
+      // (The magnet is a fixed lab object, so it takes the momentum without
+      // visibly recoiling.)
+      if (scene.sources.some((s) => s.visible && bodyContains(s, p.x))) { p.alive = false; p.hit = true; break; }
       if (P.vlen(P.vsub(p.x, cw)) > view.spanU * 6) { p.alive = false; break; }
     }
     if (p.trail.length > 6000) p.trail.splice(0, p.trail.length - 6000);
